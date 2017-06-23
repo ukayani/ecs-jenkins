@@ -81,6 +81,7 @@ Resources:
             - ecs:RegisterTaskDefinition
             - ecs:ListClusters
             - ecs:ListTaskDefinitions
+            - ecs:DescribeTaskDefinition
             - ecs:DescribeContainerInstances
             Effect: Allow
             Resource: '*'
