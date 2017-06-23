@@ -41,7 +41,7 @@ Resources:
       SecurityGroups:
       - !Ref 'ELBSecurityGroup'
       - !ImportValue
-        Fn::Sub: ${ClusterStackName}-LB-SecurityGroupId
+        Fn::Sub: ${ClusterStackName}-EcsLoadBalancerSecurityGroupId
       Listeners:
       - InstancePort: '40000'
         InstanceProtocol: HTTP
@@ -135,9 +135,9 @@ Resources:
       - Name: efs-jenkins
         Host:
           SourcePath: !Sub
-          - ${MountPath}/jenkins
-          - MounthPath:
-            Fn::ImportValue: !Sub '${ClusterStackName}-MountPath'
+            - ${MountPath}/jenkins
+            - MountPath:
+                Fn::ImportValue: !Sub '${ClusterStackName}-MountPath'
       TaskRoleArn: !Ref 'EcsTaskRole'
   Service:
     Type: AWS::ECS::Service
@@ -155,15 +155,13 @@ Resources:
         Fn::Sub: ${ClusterStackName}-ClusterName
   LogGroup:
     Type: AWS::Logs::LogGroup
-    Condition: CreateLogGroup
     Properties:
       RetentionInDays: !Ref 'LogRetention'
       LogGroupName: !Ref 'AWS::StackName'
 Outputs:
   Service:
     Description: The name of the ECS service created
-    Value: !If [CreateLogGroup, !GetAtt [Service, Name], !GetAtt [ServiceWithExistingLogGroup,
-        Name]]
+    Value: !GetAtt Service.Name
     Export:
       Name: !Sub '${AWS::StackName}-ServiceName'
   TaskArn:
@@ -179,6 +177,6 @@ Outputs:
     Value: !Ref 'LoadBalancer'
   LogGroup:
     Description: The name of the log group created/used for the app
-    Value: !If [CreateLogGroup, !Ref 'LogGroup', !Ref 'LogGroupName']
+    Value: !Ref 'LogGroup'
     Export:
       Name: !Sub '${AWS::StackName}-LogGroupName'
