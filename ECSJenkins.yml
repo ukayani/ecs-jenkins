@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates a jenkins master service in an existing ECS cluster
+Parameters:
+  ClusterStackName:
+    Description: Name of an active CloudFormation stack that contains an ECS cluster
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: ^[a-zA-Z][-a-zA-Z0-9]*$
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Subnets in which load balancer will run
+  LogRetention:
+    Type: Number
+    Description: Number of days to retain logs in CWL
+    Default: '14'
+Resources:
+  ELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Jenkins ELB Security Group
+      VpcId: !ImportValue
+        Fn::Sub: ${ClusterStackName}-VpcId
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 50000
+        ToPort: 50000
+        # Switch this to point to the ECS Instance SG
+        CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub 'ECS Jenkins ELB SG - ${AWS::StackName}'
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Subnets: !Ref 'SubnetIds'
+      SecurityGroups:
+      - !Ref 'ELBSecurityGroup'
+      - !ImportValue
+        Fn::Sub: ${ClusterStackName}-LB-SecurityGroupId
+      Listeners:
+      - InstancePort: '40000'
+        InstanceProtocol: HTTP
+        LoadBalancerPort: '80'
+        Protocol: HTTP
+      - InstancePort: '50000'
+        InstanceProtocol: TCP
+        LoadBalancerPort: '50000'
+        Protocol: TCP
+      HealthCheck:
+        HealthyThreshold: '2'
+        Interval: '30'
+        Target: TCP:40000
+        Timeout: '5'
+        UnhealthyThreshold: '5'
+      Tags:
+      - Key: Name
+        Value: !Sub 'ECS Jenkins ELB - ${AWS::StackName}'
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: ''
+          Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: JenkinsMasterPolicy
+        PolicyDocument:
+          Statement:
+          - Sid: Stmt1452746887373
+            Action:
+            - ecs:RegisterTaskDefinition
+            - ecs:ListClusters
+            - ecs:DescribeContainerInstances
+            Effect: Allow
+            Resource: '*'
+          - Sid: Stmt1452746887374
+            Action:
+            - ecs:StopTask
+            - ecs:ListContainerInstances
+            Effect: Allow
+            Resource: !Join [/, [!Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster',
+                !ImportValue {'Fn::Sub': '${ClusterStackName}-ClusterName'}]]
+          - Sid: Stmt1452746887375
+            Action:
+            - ecs:RunTask
+            Effect: Allow
+            Resource: !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/jenkins-slave-*'
+          - Sid: Stmt1452746887376
+            Action:
+            # Merge this with above action
+            - ecs:StopTask
+            - ecs:DescribeTasks
+            Effect: Allow
+            Resource: !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/*'
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+      - Name: jenkins
+        Image: jenkins
+        Hostname: jenkins
+        Cpu: 512
+        Memory: 2048
+        User: root
+        Environment:
+        - Name: JAVA_OPTS
+          Value: -Djenkins.install.runSetupWizard=false
+        Essential: true
+        MountPoints:
+        - ContainerPath: /var/jenkins_home
+          SourceVolume: efs-jenkins
+          ReadOnly: false
+        PortMappings:
+        - HostPort: 40000
+          ContainerPort: 8080
+        - HostPort: 50000
+          ContainerPort: 50000
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref 'AWS::StackName'
+            awslogs-region: !Ref 'AWS::Region'
+            awslogs-stream-prefix: master
+      Volumes:
+      - Name: efs-jenkins
+        Host:
+          SourcePath: !Sub
+          - ${MountPath}/jenkins
+          - MounthPath:
+            Fn::ImportValue: !Sub '${ClusterStackName}-MountPath'
+      TaskRoleArn: !Ref 'EcsTaskRole'
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: LogGroup
+    Properties:
+      Role: !ImportValue
+        Fn::Sub: ${ClusterStackName}-EcsServiceRole
+      TaskDefinition: !Ref 'TaskDefinition'
+      DesiredCount: 1
+      LoadBalancers:
+      - ContainerName: jenkins
+        ContainerPort: '8080'
+        LoadBalancerName: !Ref 'LoadBalancer'
+      Cluster: !ImportValue
+        Fn::Sub: ${ClusterStackName}-ClusterName
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: CreateLogGroup
+    Properties:
+      RetentionInDays: !Ref 'LogRetention'
+      LogGroupName: !Ref 'AWS::StackName'
+Outputs:
+  Service:
+    Description: The name of the ECS service created
+    Value: !If [CreateLogGroup, !GetAtt [Service, Name], !GetAtt [ServiceWithExistingLogGroup,
+        Name]]
+    Export:
+      Name: !Sub '${AWS::StackName}-ServiceName'
+  TaskArn:
+    Description: The ARN of the task created for the service
+    Value: !Ref 'TaskDefinition'
+  LoadBalancerDNS:
+    Description: The dns name of the app load balancer for the service
+    Value: !GetAtt [LoadBalancer, DNSName]
+    Export:
+      Name: !Sub '${AWS::StackName}-LoadBalancerDNSName'
+  LoadBalancer:
+    Description: The ARN of the app load balancer for the service
+    Value: !Ref 'LoadBalancer'
+  LogGroup:
+    Description: The name of the log group created/used for the app
+    Value: !If [CreateLogGroup, !Ref 'LogGroup', !Ref 'LogGroupName']
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroupName'
