@@ -97,11 +97,17 @@ Resources:
             Resource: !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/jenkins-slave-*'
           - Sid: Stmt1452746887376
             Action:
-            # Merge this with above action
             - ecs:StopTask
             - ecs:DescribeTasks
             Effect: Allow
             Resource: !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/*'
+            # To allow the master to assign a taskRole to a slave task def
+          - Sid: Stmt1452746887377
+            Action:
+            - iam:PassRole
+            Effect: Allow
+            Resource: "arn:aws:iam::444913385113:role/*"
+            
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
