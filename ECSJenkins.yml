@@ -115,14 +115,19 @@ Resources:
     Properties:
       ContainerDefinitions:
       - Name: jenkins
-        Image: jenkins
+        Image: loyaltyone/jenkins
         Hostname: jenkins
         Cpu: 512
         Memory: 2048
-        User: root
         Environment:
         - Name: JAVA_OPTS
           Value: -Djenkins.install.runSetupWizard=false
+        # We will run as this user (docker-user) 
+        - Name: LOCAL_USER_ID
+          Value: 5001
+        # EFS group  
+        - Name: LOCAL_USER_GID
+          Value: 555
         Essential: true
         MountPoints:
         - ContainerPath: /var/jenkins_home
@@ -143,7 +148,7 @@ Resources:
       - Name: efs-jenkins
         Host:
           SourcePath: !Sub
-            - ${MountPath}/jenkins
+            - ${MountPath}/docker-user/jenkins
             - MountPath:
                 Fn::ImportValue: !Sub '${ClusterStackName}-MountPath'
       TaskRoleArn: !Ref 'EcsTaskRole'
