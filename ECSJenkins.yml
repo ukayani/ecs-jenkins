@@ -9,11 +9,29 @@ Parameters:
     AllowedPattern: ^[a-zA-Z][-a-zA-Z0-9]*$
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
-    Description: Subnets in which load balancer will run
-  LogRetention:
+    Description: Subnets in which load balancer will run (Private)
+  AllowedCidr:
+    Description: The IP address range that source traffic to the jenkins master is allowed
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x. 
+  MasterLogRetention:
     Type: Number
-    Description: Number of days to retain logs in CWL
+    Description: Number of days to retain logs for the jenkins-master in CWL
     Default: '14'
+  SlaveLogRetention:
+    Type: Number
+    Description: Number of days to retain logs for the jenkins slaves in CWL
+    Default: '1'
+  HostedZoneName:
+    Type: String
+    Description: The domain of the hosted zone ending with a period
+  CertificateArn:
+    Type: String
+    Description: The ARN of a certificate to attach to the Load Balancer
 Resources:
   ELBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -23,20 +41,26 @@ Resources:
         Fn::Sub: ${ClusterStackName}-VpcId
       SecurityGroupIngress:
       - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: !Ref 'AllowedCidr'
+      - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
-        CidrIp: 0.0.0.0/0
+        CidrIp: !Ref 'AllowedCidr'
       - IpProtocol: tcp
         FromPort: 50000
         ToPort: 50000
-        # Switch this to point to the ECS Instance SG
-        CidrIp: 0.0.0.0/0
+        # only allow instances in the cluster to talk on the slave port
+        SourceSecurityGroupId: !ImportValue
+          Fn::Sub: ${ClusterStackName}-EcsSecurityGroupId
       Tags:
       - Key: Name
         Value: !Sub 'ECS Jenkins ELB SG - ${AWS::StackName}'
   LoadBalancer:
     Type: AWS::ElasticLoadBalancing::LoadBalancer
     Properties:
+      Scheme: internal
       Subnets: !Ref 'SubnetIds'
       SecurityGroups:
       - !Ref 'ELBSecurityGroup'
@@ -46,7 +70,12 @@ Resources:
       - InstancePort: '40000'
         InstanceProtocol: HTTP
         LoadBalancerPort: '80'
-        Protocol: HTTP
+        Protocol: HTTP      
+      - InstancePort: '40000'
+        InstanceProtocol: HTTP
+        LoadBalancerPort: '443'
+        Protocol: HTTPS
+        SSLCertificateId: !Ref 'CertificateArn'
       - InstancePort: '50000'
         InstanceProtocol: TCP
         LoadBalancerPort: '50000'
@@ -128,6 +157,8 @@ Resources:
         # EFS group  
         - Name: LOCAL_USER_GID
           Value: 555
+        - Name: JENKINS_OPTS
+          Value: "--prefix=/jenkins"
         Essential: true
         MountPoints:
         - ContainerPath: /var/jenkins_home
@@ -141,9 +172,9 @@ Resources:
         LogConfiguration:
           LogDriver: awslogs
           Options:
-            awslogs-group: !Ref 'AWS::StackName'
+            awslogs-group: !Ref 'MasterLogGroup'
             awslogs-region: !Ref 'AWS::Region'
-            awslogs-stream-prefix: master
+            awslogs-stream-prefix: ecs
       Volumes:
       - Name: efs-jenkins
         Host:
@@ -154,7 +185,7 @@ Resources:
       TaskRoleArn: !Ref 'EcsTaskRole'
   Service:
     Type: AWS::ECS::Service
-    DependsOn: LogGroup
+    DependsOn: MasterLogGroup
     Properties:
       Role: !ImportValue
         Fn::Sub: ${ClusterStackName}-EcsServiceRole
@@ -166,11 +197,28 @@ Resources:
         LoadBalancerName: !Ref 'LoadBalancer'
       Cluster: !ImportValue
         Fn::Sub: ${ClusterStackName}-ClusterName
-  LogGroup:
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+  MasterLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      RetentionInDays: !Ref 'LogRetention'
-      LogGroupName: !Ref 'AWS::StackName'
+      RetentionInDays: !Ref 'MasterLogRetention'
+      LogGroupName: !Sub '${AWS::StackName}-master'
+  SlaveLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref 'SlaveLogRetention'
+      LogGroupName: !Sub '${AWS::StackName}-slave'
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties: 
+      AliasTarget:
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneNameID
+        DNSName: !GetAtt LoadBalancer.DNSName
+      HostedZoneName: !Ref 'HostedZoneName'
+      Name: !Sub 'jenkins.${HostedZoneName}'
+      Type: A
 Outputs:
   Service:
     Description: The name of the ECS service created
@@ -188,8 +236,13 @@ Outputs:
   LoadBalancer:
     Description: The ARN of the app load balancer for the service
     Value: !Ref 'LoadBalancer'
-  LogGroup:
-    Description: The name of the log group created/used for the app
-    Value: !Ref 'LogGroup'
+  MasterLogGroup:
+    Description: The name of the log group created/used for the jenkins master
+    Value: !Ref 'MasterLogGroup'
     Export:
-      Name: !Sub '${AWS::StackName}-LogGroupName'
+      Name: !Sub '${AWS::StackName}-MasterLogGroupName'
+  SlaveLogGroup:
+    Description: The name of the log group created/used for the jenkins slave
+    Value: !Ref 'SlaveLogGroup'
+    Export:
+      Name: !Sub '${AWS::StackName}-SlaveLogGroupName'
