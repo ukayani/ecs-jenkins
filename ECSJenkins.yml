@@ -157,8 +157,6 @@ Resources:
         # EFS group  
         - Name: LOCAL_USER_GID
           Value: 555
-        - Name: JENKINS_OPTS
-          Value: "--prefix=/jenkins"
         Essential: true
         MountPoints:
         - ContainerPath: /var/jenkins_home
@@ -187,6 +185,7 @@ Resources:
     Type: AWS::ECS::Service
     DependsOn: MasterLogGroup
     Properties:
+      ServiceName: jenkins-master
       Role: !ImportValue
         Fn::Sub: ${ClusterStackName}-EcsServiceRole
       TaskDefinition: !Ref 'TaskDefinition'
