@@ -31,7 +31,11 @@ Parameters:
     Description: The domain of the hosted zone ending with a period
   CertificateArn:
     Type: String
-    Description: The ARN of a certificate to attach to the Load Balancer
+    Description: The ARN of a certificate to attach to the Load Balancer.
+  KinesisStackName: 
+    Type: String
+    Description: The name of an existing Kinesis Stack used for streaming logs from cloudwatch to another destination
+  
 Resources:
   ELBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -218,6 +222,19 @@ Resources:
       HostedZoneName: !Ref 'HostedZoneName'
       Name: !Sub 'jenkins.${HostedZoneName}'
       Type: A
+  # Subscribes to jenkins audit logs (see Audit Trail Plugin)    
+  SubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    DependsOn:
+    - MasterLogGroup
+    Properties:
+      RoleArn: !ImportValue
+        Fn::Sub: ${KinesisStackName}-Role-Arn
+      LogGroupName: !Ref 'MasterLogGroup'
+      FilterPattern: "AUDIT"
+      DestinationArn: !ImportValue
+        Fn::Sub: ${KinesisStackName}-Stream-Arn
+      
 Outputs:
   Service:
     Description: The name of the ECS service created
