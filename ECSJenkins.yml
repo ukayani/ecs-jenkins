@@ -35,7 +35,18 @@ Parameters:
   KinesisStackName: 
     Type: String
     Description: The name of an existing Kinesis Stack used for streaming logs from cloudwatch to another destination
-  
+  S3BackupBucketExists:
+    Default: 'no'
+    Description: If set to yes, an existing bucket will be used. Otherwise it will be created
+    Type: String
+    AllowedValues:
+    - 'yes'
+    - 'no'  
+  S3BackupBucketName:
+    Type: String
+    Description: The name of the S3 Bucket to which the Jenkins master has read/write access for backups
+Conditions:
+  CreateS3Bucket: !Equals [!Ref 'S3BackupBucketExists', 'no']
 Resources:
   ELBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -141,8 +152,22 @@ Resources:
             Action:
             - iam:PassRole
             Effect: Allow
-            Resource: "arn:aws:iam::444913385113:role/*"
-            
+            Resource: 'arn:aws:iam::444913385113:role/*'
+      - PolicyName: JenkinsMasterS3Backup
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Sid: Stmt1500512896858
+            Action:
+            - s3:ListBucket
+            Effect: Allow
+            Resource: !Sub 'arn:aws:s3:::${S3BackupBucketName}'
+          - Sid: Stmt1500512926608
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            Effect: Allow
+            Resource: !Sub 'arn:aws:s3:::${S3BackupBucketName}/*'
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -234,7 +259,12 @@ Resources:
       FilterPattern: "AUDIT"
       DestinationArn: !ImportValue
         Fn::Sub: ${KinesisStackName}-Stream-Arn
-      
+  S3Bucket:
+    Condition: CreateS3Bucket
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref 'S3BackupBucketName'
+    DeletionPolicy: Retain              
 Outputs:
   Service:
     Description: The name of the ECS service created
@@ -262,3 +292,8 @@ Outputs:
     Value: !Ref 'SlaveLogGroup'
     Export:
       Name: !Sub '${AWS::StackName}-SlaveLogGroupName'
+  S3BackupBucket:
+    Description: The name of the S3 bucket to which Jenkins can store backups
+    Value: !Ref 'S3BackupBucketName'
+    Export:
+      Name: !Sub '${AWS::StackName}-S3BackupBucket'
