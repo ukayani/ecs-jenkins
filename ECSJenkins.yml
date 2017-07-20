@@ -186,6 +186,8 @@ Resources:
         # EFS group  
         - Name: LOCAL_USER_GID
           Value: 555
+        - Name: JENKINS_BACKUP_BUCKET
+          Value: !Ref 'S3BackupBucketName'
         Essential: true
         MountPoints:
         - ContainerPath: /var/jenkins_home
