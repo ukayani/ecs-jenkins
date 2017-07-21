@@ -45,6 +45,11 @@ Parameters:
   S3BackupBucketName:
     Type: String
     Description: The name of the S3 Bucket to which the Jenkins master has read/write access for backups
+  TimeZone:
+    Type: String
+    Description: The timezone ID to run Jenkins with
+    Default: 'America/Toronto'
+    
 Conditions:
   CreateS3Bucket: !Equals [!Ref 'S3BackupBucketExists', 'no']
 Resources:
@@ -179,7 +184,7 @@ Resources:
         Memory: 2048
         Environment:
         - Name: JAVA_OPTS
-          Value: -Djenkins.install.runSetupWizard=false
+          Value: !Sub '-Djenkins.install.runSetupWizard=false -Dorg.apache.commons.jelly.tags.fmt.timeZone=${TimeZone}'
         # We will run as this user (docker-user) 
         - Name: LOCAL_USER_ID
           Value: 5001
