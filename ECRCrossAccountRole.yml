@@ -31,4 +31,4 @@ Resources:
 Outputs:
   RoleArn:
     Description: The ARN of the cross account role
-    Value: !GetAttr ECRCrossAccountRole.Arn
+    Value: !GetAtt ECRCrossAccountRole.Arn
