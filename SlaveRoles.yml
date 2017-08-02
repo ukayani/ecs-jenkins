@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Creates a jenkins master service in an existing ECS cluster
+Description: Creates roles for jenkins slave tasks
 Parameters:
   ECRRoleArn:
     Description: The cross account Role for ECR push access
