@@ -25,3 +25,7 @@ Resources:
             Effect: Allow
             Action: sts:AssumeRole
             Resource: !Ref 'ECRRoleArn'
+Outputs:
+  ECRTaskRoleArn:
+    Description: The ARN of the cross account role
+    Value: !GetAtt EcsTaskRoleECR.Arn
