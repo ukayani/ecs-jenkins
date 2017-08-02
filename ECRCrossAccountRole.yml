@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates a cross account role to give an account access to an ECR repository in current account
+Parameters:
+  AccountId:
+    Description: AWS Account ID which is allowed to assume this role
+    Type: String
+Resources:
+  ECRCrossAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: ''
+          Effect: Allow
+          Principal:
+            AWS: !Sub 'arn:aws:iam::${AccountId}:root'
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: ECRPushAccess
+        PolicyDocument:
+          Statement:
+          - Sid: Stmt1452746887373
+            Effect: Allow
+            Action:
+            - ecr:GetAuthorizationToken
+            - ecr:DescribeImages
+            - ecr:ListImages
+            Resource: !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:repository/*'
+Outputs:
+  RoleArn:
+    Description: The ARN of the cross account role
+    Value: !GetAttr ECRCrossAccountRole.Arn

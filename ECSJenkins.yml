@@ -49,7 +49,18 @@ Parameters:
     Type: String
     Description: The timezone ID to run Jenkins with
     Default: 'America/Toronto'
-    
+  Memory:
+    Type: Number
+    Description: The soft memory limit of the Jenkins master
+    Default: '4096'
+  Cpu:
+    Type: Number
+    Description: The minimum CPU units reserved for jenkins master. (1000 = 1 core)
+    Default: '1000'
+  LoadBalancerIdleTimeout:
+    Type: Number
+    Description: The time in seconds the ELB will keep idle connections active. Increase this if you see intermittent disconnects of slaves
+    Default: '180'
 Conditions:
   CreateS3Bucket: !Equals [!Ref 'S3BackupBucketExists', 'no']
 Resources:
@@ -86,6 +97,8 @@ Resources:
       - !Ref 'ELBSecurityGroup'
       - !ImportValue
         Fn::Sub: ${ClusterStackName}-EcsLoadBalancerSecurityGroupId
+      ConnectionSettings:
+        IdleTimeout: !Ref 'LoadBalancerIdleTimeout'
       Listeners:
       - InstancePort: '40000'
         InstanceProtocol: HTTP
@@ -180,8 +193,8 @@ Resources:
       - Name: jenkins
         Image: loyaltyone/jenkins
         Hostname: jenkins
-        Cpu: 512
-        Memory: 2048
+        Cpu: !Ref 'Cpu'
+        MemoryReservation: !Ref 'Memory'
         Environment:
         - Name: JAVA_OPTS
           Value: !Sub '-Djenkins.install.runSetupWizard=false -Dorg.apache.commons.jelly.tags.fmt.timeZone=${TimeZone}'
