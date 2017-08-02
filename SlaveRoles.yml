@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates a jenkins master service in an existing ECS cluster
+Parameters:
+  ECRRoleArn:
+    Description: The cross account Role for ECR push access
+    Type: String
+Resources:
+  EcsTaskRoleECR:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: ''
+          Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: JenkinsSlaveCrossAccount
+        PolicyDocument:
+          Statement:
+          - Sid: Stmt1452746887373
+            Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !Ref 'ECRRoleArn'
