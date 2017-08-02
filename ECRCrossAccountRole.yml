@@ -24,10 +24,14 @@ Resources:
           - Sid: Stmt1452746887373
             Effect: Allow
             Action:
-            - ecr:GetAuthorizationToken
             - ecr:DescribeImages
             - ecr:ListImages
-            Resource: !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:repository/*'
+            Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
+          - Sid: Stmt1452746887374
+            Effect: Allow
+            Action:
+            - ecr:GetAuthorizationToken
+            Resource: '*'                    
 Outputs:
   RoleArn:
     Description: The ARN of the cross account role
