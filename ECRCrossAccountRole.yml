@@ -24,9 +24,15 @@ Resources:
           - Sid: Stmt1452746887373
             Effect: Allow
             Action:
-            - ecr:DescribeImages
-            - ecr:ListImages
+            - ecr:*
             Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
+          - Sid: Stmt1452746887373
+            Effect: Deny
+            Action:
+            - ecr:BatchDeleteImage
+            - ecr:DeleteRepositoryPolicy
+            - ecr:SetRepositoryPolicy
+            Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'            
           - Sid: Stmt1452746887374
             Effect: Allow
             Action:
