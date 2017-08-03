@@ -8,6 +8,7 @@ Resources:
   EcsTaskRoleECR:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: JenkinsSlaveECRRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -18,7 +19,7 @@ Resources:
           Action: sts:AssumeRole
       Path: /
       Policies:
-      - PolicyName: JenkinsSlaveCrossAccount
+      - PolicyName: JenkinsSlaveECRPolicy
         PolicyDocument:
           Statement:
           - Sid: Stmt1452746887373

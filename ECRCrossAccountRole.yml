@@ -8,6 +8,7 @@ Resources:
   ECRCrossAccountRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: JenkinsECRCrossAccountRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -21,7 +22,7 @@ Resources:
       - PolicyName: ECRPushAccess
         PolicyDocument:
           Statement:
-          - Sid: Stmt1452746887373
+          - Sid: Stmt1452746887372
             Effect: Allow
             Action:
             - ecr:*
