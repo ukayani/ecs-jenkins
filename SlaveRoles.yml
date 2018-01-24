@@ -4,11 +4,14 @@ Parameters:
   ECRRoleArn:
     Description: The cross account Role for ECR push access
     Type: String
+  JenkinsCacheBucket:
+    Description: The name of the jenkins cache bucket
+    Type: String  
 Resources:
-  EcsTaskRoleECR:
+  JenkinsSlaveRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: JenkinsSlaveECRRole
+      RoleName: JenkinsSlaveRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -26,7 +29,18 @@ Resources:
             Effect: Allow
             Action: sts:AssumeRole
             Resource: !Ref 'ECRRoleArn'
+      - PolicyName: JenkinsSlaveS3Cache
+        PolicyDocument:
+          Statement:  
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            Resource: !Sub 'arn:aws:s3:::${JenkinsCacheBucket}/*'
+          - Effect: Allow
+            Action:
+            - s3:ListBucket
+            Resource: !Sub 'arn:aws:s3:::${JenkinsCacheBucket}'
 Outputs:
-  ECRTaskRoleArn:
-    Description: The ARN of the cross account role
-    Value: !GetAtt EcsTaskRoleECR.Arn
+  TaskRoleArn:
+    Description: The ARN of the jenkins slave role
+    Value: !GetAtt JenkinsSlaveRole.Arn
